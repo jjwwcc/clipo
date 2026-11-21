@@ -409,7 +409,7 @@ async function loadFile(file) {
   $('#sizeBadge').hidden = false;
   $('#stageHint').hidden = false;
   renderFileName();
-  $('#exportBtn').disabled = false;
+  $('#exportBtn').disabled = false; $('#gifBtn').disabled = false;
   $('#addCueBtn').disabled = false;
   $('#addCueBtn2').disabled = false;
   $('#durTime').textContent = fmt(S.src.duration);
@@ -939,6 +939,16 @@ function closeModal() {
   $('#modal').hidden = true;
   const v = $('#mVideo'); v.pause();
   if (v.src) { URL.revokeObjectURL(v.src); v.removeAttribute('src'); v.load(); }
+  const im = $('#mImg');
+  if (im.src) { URL.revokeObjectURL(im.src); im.removeAttribute('src'); }
+}
+/** 打开导出弹窗并重置为"进度"状态 */
+function openModal(title) {
+  $('#modal').hidden = false;
+  $('#mCanvas').hidden = false; $('#mVideo').hidden = true; $('#mImg').hidden = true;
+  $('#gifOpts').hidden = true; $('#mStart').hidden = true; $('#mDownload').hidden = true;
+  $('#mTitle').textContent = title; $('#mCancel').textContent = tr('cancel');
+  $('#mBar').style.width = '0%'; $('#mInfo').textContent = tr('preparing');
 }
 
 async function pickEncoderConfig(W, H, fps) {
@@ -957,10 +967,9 @@ async function startExport() {
   const D = S.demux;
   const { W, H } = outSize();
   const job = (exportJob = { cancelled: false });
-  const modal = $('#modal'), mCanvas = $('#mCanvas'), mVideo = $('#mVideo'), bar = $('#mBar'), info = $('#mInfo'), dl = $('#mDownload');
-  modal.hidden = false; mCanvas.hidden = false; mVideo.hidden = true; dl.hidden = true;
-  $('#mTitle').textContent = tr('exporting'); $('#mCancel').textContent = tr('cancel');
-  bar.style.width = '0%'; info.textContent = tr('preparing');
+  const mCanvas = $('#mCanvas'), mVideo = $('#mVideo'), bar = $('#mBar'), info = $('#mInfo'), dl = $('#mDownload');
+  openModal(tr('exporting'));
+  dl.textContent = tr('download');
   mCanvas.width = W > H ? 480 : Math.round(300 * W / H); mCanvas.height = Math.round(mCanvas.width * H / W);
   const mctx = mCanvas.getContext('2d');
 
@@ -1074,6 +1083,163 @@ async function startExport() {
   } finally {
     try { dec && dec.state !== 'closed' && dec.close(); } catch {}
     try { enc && enc.state !== 'closed' && enc.close(); } catch {}
+    exportJob = null;
+  }
+}
+
+/* ------------------------------------------------------------------ GIF */
+// GIF 没有硬性时长上限，但每帧都是完整的 256 色图像，体积随 时长 × 帧率 × 尺寸 线性增长，
+// 所以限制最长 GIF_MAX 秒（从入点算起），并让用户选尺寸 / 帧率。
+const GIF_MAX = 20;
+const GIF = { long: 480, fps: 15 };
+
+function gifPlan() {
+  const { W, H } = outSize();
+  const k = GIF.long / Math.max(W, H);
+  const gW = Math.max(2, Math.round(W * k / 2) * 2), gH = Math.max(2, Math.round(H * k / 2) * 2);
+  const tIn = S.trimIn, full = S.trimOut - S.trimIn;
+  const dur = Math.min(full, GIF_MAX);
+  return { gW, gH, tIn, tEnd: tIn + dur, dur, full, n: Math.max(1, Math.round(dur * GIF.fps)) };
+}
+function renderGifOpts() {
+  ['gifW', 'gifFps'].forEach((id) => {
+    const v = id === 'gifW' ? GIF.long : GIF.fps;
+    $(`#${id}`).querySelectorAll('button').forEach((b) => b.classList.toggle('active', +b.dataset.v === v));
+  });
+  const p = gifPlan();
+  let html = tr('gifInfo', { W: p.gW, H: p.gH, dur: fmt(p.dur), n: p.n });
+  if (p.full > GIF_MAX + 1e-3) html += '<br/>' + tr('gifTooLong', { max: GIF_MAX, dur: fmt(p.full) });
+  $('#gifNote').innerHTML = html;
+}
+['gifW', 'gifFps'].forEach((id) => $(`#${id}`).addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (id === 'gifW') GIF.long = +b.dataset.v; else GIF.fps = +b.dataset.v;
+  renderGifOpts();
+}));
+
+/** 第一步：弹窗显示 GIF 设置（尺寸 / 帧率 / 时长提示），预览当前帧 */
+function openGifDialog() {
+  if (!S.src || exportJob) return;
+  video.pause();
+  openModal(tr('gifTitle'));
+  $('#gifOpts').hidden = false; $('#mStart').hidden = false;
+  $('#mBar').style.width = '0%'; $('#mInfo').textContent = '';
+  const { W, H } = outSize(), mc = $('#mCanvas');
+  mc.width = W > H ? 480 : Math.round(300 * W / H); mc.height = Math.round(mc.width * H / W);
+  mc.getContext('2d').drawImage($('#preview'), 0, 0, mc.width, mc.height);
+  renderGifOpts();
+}
+$('#gifBtn').addEventListener('click', openGifDialog);
+$('#mStart').addEventListener('click', () => startGif());
+document.addEventListener('langchange', () => { if (!$('#gifOpts').hidden) renderGifOpts(); });
+
+/** 第二步：WebCodecs 解码 → 与预览同一个 render() 合成 → 按目标帧率抽帧 → gifenc 量化编码 */
+async function startGif() {
+  if (!S.src || exportJob) return;
+  const D = S.demux;
+  const { gW, gH, tIn, tEnd, dur } = gifPlan();
+  const fps = GIF.fps;
+  const job = (exportJob = { cancelled: false });
+  const mCanvas = $('#mCanvas'), mImg = $('#mImg'), bar = $('#mBar'), info = $('#mInfo'), dl = $('#mDownload');
+  $('#gifOpts').hidden = true; $('#mStart').hidden = true;
+  $('#mTitle').textContent = tr('exporting'); info.textContent = tr('preparing');
+  const mctx = mCanvas.getContext('2d');
+
+  const t0 = performance.now();
+  let dec;
+  try {
+    const dcfg = decoderConfig(D);
+    if (!(await VideoDecoder.isConfigSupported(dcfg)).supported) throw new Error(tr('errCantDecode', { codec: D.vt.codec }));
+    const eps = 1e-4;
+    const inRange = (t) => t >= tIn - eps && t < tEnd - eps;
+    const keep = [];
+    D.vs.forEach((s, i) => { if (inRange(s.cts / s.timescale - D.vOff)) keep.push(i); });
+    if (!keep.length) throw new Error(tr('errEmptyTrim'));
+    let first = keep[0];
+    const last = keep[keep.length - 1];
+    while (first > 0 && !D.vs[first].is_sync) first--;
+
+    const total = Math.max(1, Math.round(dur * fps));
+    const oc = new OffscreenCanvas(gW, gH);
+    const octx = oc.getContext('2d', { alpha: false, willReadFrequently: true });
+    const { GIFEncoder, quantize, applyPalette } = window.gifenc;
+    const gif = GIFEncoder();
+    // 每帧延时用"厘秒累计取整"计算，避免 15fps（6.67cs）这类帧率累积漂移
+    const cs = (k) => Math.round(k * 100 / fps);
+    let pending = null, written = 0, err = null;
+    const flushPending = (kNext) => {
+      if (!pending) return;
+      const delay = Math.max(2, cs(kNext) - cs(pending.k)) * 10;
+      gif.writeFrame(pending.index, gW, gH, { palette: pending.palette, delay, repeat: 0 });
+      written++;
+      pending = null;
+    };
+
+    dec = new VideoDecoder({
+      output: (frame) => {
+        if (job.cancelled || err) { frame.close(); return; }
+        const t = frame.timestamp / 1e6 - D.vOff;
+        // 第 k 个 GIF 帧对应时刻 tIn + k/fps；源帧更密时跳过，更稀时让上一帧延时变长
+        const k = Math.max(0, Math.floor((t - tIn) * fps + 1e-3));
+        if (!inRange(t) || k >= total || (pending && k <= pending.k)) { frame.close(); return; }
+        try {
+          const { src, w, h } = frameSource(frame, D.rot);
+          render(octx, gW, gH, src, w, h, t, null);
+          frame.close();
+          const rgba = octx.getImageData(0, 0, gW, gH).data;
+          const palette = quantize(rgba, 256);
+          const index = applyPalette(rgba, palette);
+          flushPending(k);
+          pending = { k, index, palette };
+          if (k % 3 === 0) mctx.drawImage(oc, 0, 0, mCanvas.width, mCanvas.height);
+        } catch (e) { err = e; try { frame.close(); } catch {} }
+      },
+      error: (e) => (err = e),
+    });
+    dec.configure(dcfg);
+
+    const tick = () => {
+      const n = pending ? pending.k + 1 : written;
+      bar.style.width = `${(Math.min(1, n / total) * 100).toFixed(1)}%`;
+      info.textContent = tr('gifProgress', { n: Math.min(n, total), total, W: gW, H: gH, fps });
+    };
+    for (let i = first; i <= last; i++) {
+      if (job.cancelled) throw new Error('cancelled');
+      if (err) throw err;
+      while (dec.decodeQueueSize > 6) {
+        await new Promise((r) => setTimeout(r, 2));
+        if (err) throw err;
+      }
+      dec.decode(toChunk(D.vs[i]));
+      if (i % 4 === 0) { tick(); await new Promise((r) => setTimeout(r, 0)); }
+    }
+    await dec.flush();
+    if (err) throw err;
+    if (job.cancelled) throw new Error('cancelled');
+    flushPending(total);
+    if (!written) throw new Error(tr('errEmptyTrim'));
+    gif.finish();
+    const blob = new Blob([gif.bytes()], { type: 'image/gif' });
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    const mb = blob.size / 1048576;
+
+    $('#mTitle').textContent = tr('exportDone');
+    bar.style.width = '100%';
+    info.textContent = tr('gifDone', { W: gW, H: gH, fps, dur: fmt(dur), mb: mb.toFixed(1), secs }) + (mb > 8 ? tr('gifBig') : '');
+    mCanvas.hidden = true; mImg.hidden = false;
+    mImg.src = URL.createObjectURL(blob);
+    dl.hidden = false; dl.href = mImg.src; dl.textContent = tr('downloadGif');
+    dl.download = S.src.name.replace(/\.\w+$/, '') + `_${gW}x${gH}.gif`;
+    $('#mCancel').textContent = tr('close');
+  } catch (e) {
+    if (e.message !== 'cancelled') {
+      console.error(e);
+      $('#mTitle').textContent = tr('exportFailed');
+      info.textContent = e.message || String(e);
+      $('#mCancel').textContent = tr('close');
+    }
+  } finally {
+    try { dec && dec.state !== 'closed' && dec.close(); } catch {}
     exportJob = null;
   }
 }

@@ -12,6 +12,7 @@ Clipo 基于 [WebCodecs](https://developer.mozilla.org/docs/Web/API/WebCodecs_AP
 | ✂️ **裁剪（Trim）** | 时间轴上拖动黄色入点 / 出点手柄，或按 `I` / `O`；导出精确到帧 |
 | 💬 **字幕** | 时间轴字幕轨可视化编辑（拖动、拉伸、双击新建），支持 SRT / VTT 导入与 SRT 导出 |
 | 💧 **水印** | 文字或图片 Logo，透明度、大小、九宫格定位、自由拖动、平铺防盗模式 |
+| 🎞️ **GIF 动图** | 把裁剪区间（最长 20 秒）连同字幕、水印、纵横比一起导出为循环 GIF，可选长边 320 / 480 / 640 px、10 / 15 / 20 fps |
 | 📐 **纵横比** | 原始 / 16:9 / 9:16 / 1:1 / 4:3 / 3:4 / 4:5 / 21:9，完整显示或填满裁切，模糊或纯色背景 |
 
 此外：中英双语界面（自动跟随浏览器语言）、720p / 1080p / 原始分辨率输出、原音频无损直通、自动识别手机视频的旋转信息。
@@ -115,6 +116,7 @@ npm run samples      # 生成 samples/landscape.mp4 与 samples/rotated.mp4
 | --- | --- | --- | --- |
 | [mp4box.js](https://github.com/gpac/mp4box.js) | 0.5.2 | MP4 / MOV 解封装，读取编码参数、样本、旋转矩阵、编辑列表 | BSD-3-Clause |
 | [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) | 5.1.3 | 把编码后的视频块和原始音频块封装为 MP4（fast-start） | MIT |
+| [gifenc](https://github.com/mattdesl/gifenc) | 1.0.3 | GIF 调色板量化与 LZW 编码（CJS 构建包了一层 IIFE 暴露为 `window.gifenc`） | MIT |
 
 两者都以 UMD 文件放在 `vendor/`，页面不依赖任何 CDN。
 
@@ -128,7 +130,8 @@ npm run samples      # 生成 samples/landscape.mp4 与 samples/rotated.mp4
 ├── app.js                # 全部逻辑（见下方分区）
 ├── vendor/
 │   ├── mp4box.all.min.js
-│   └── mp4-muxer.js
+│   ├── mp4-muxer.js
+│   └── gifenc.js         # gifenc 1.0.3，包装为全局 window.gifenc
 ├── scripts/
 │   └── make-samples.sh   # 用 ffmpeg 生成测试视频
 ├── cloudflare.config.ts  # Cloudflare Worker 配置（名称、自定义域名）
@@ -176,6 +179,16 @@ AAC 音频样本直接从源文件复制进新 MP4，不解码也不重编码，
 
 **8. 时间轴缩略图**
 不用 `<video>` 逐个 seek 截图，而是用 `VideoDecoder` 只解码约 40 个关键帧，几乎瞬间完成。
+
+**9. GIF 导出**
+GIF 格式本身没有时长上限，但每一帧都是一张完整的 256 色图片，没有 H.264 那样的帧间压缩，体积大致随「时长 × 帧率 × 像素数」线性增长（480×270、15 fps 的彩条测试视频约 0.2 MB/秒，真实画面通常更大）。因此：
+
+- 只取裁剪区间，**最长 20 秒**（`GIF_MAX`），超出时在弹窗中提示，只生成入点后的前 20 秒；
+- 尺寸按长边 320 / 480 / 640 px 缩放，帧率 10 / 15 / 20 fps 可选，导出后超过 8 MB 会提示降低设置；
+- 解码流程与 MP4 相同（关键帧预解码、呈现时间对齐），每个解码帧算出它对应的 GIF 帧序号 `k = ⌊(t − 入点) × fps⌋`，同一序号只取第一帧；源帧率低于目标帧率时上一帧的延时自动变长；
+- `render()` 直接在 GIF 尺寸的画布上合成，然后用 gifenc 逐帧量化（每帧独立 256 色调色板）并写入；
+- GIF 延时单位是 1/100 秒，15 fps 的 6.67 厘秒无法精确表示，所以每帧延时按 `round((k+1)·100/fps) − round(k·100/fps)` 累计取整（交替 7 / 6 厘秒），总时长不漂移；
+- GIF 不含声音，设置为无限循环。
 
 ## 国际化
 
@@ -256,6 +269,7 @@ npm run deploy       # = npm run build（复制站点文件到 dist/）+ cf depl
 - **Trim:** drag in / out handles on the timeline or press `I` / `O`; the cut is frame-accurate.
 - **Subtitles:** edit them visually on a timeline track (drag, resize, double-click to add), import SRT / VTT, export SRT. Style options: font, size, colour, outline, background box.
 - **Watermark:** text or image logo with opacity and size, 3×3 position presets, free dragging, and a tiled anti-theft mode.
+- **GIF:** export the trimmed range (up to 20 s) as a looping GIF with subtitles, watermark and framing baked in. Long edge 320 / 480 / 640 px, 10 / 15 / 20 fps. GIF has no inter-frame compression, so file size grows with duration × frame rate × pixels — hence the 20-second cap.
 - **Aspect ratio:** Original, 16:9, 9:16, 1:1, 4:3, 3:4, 4:5 or 21:9. Fit the whole picture or fill and crop, on a blurred or solid background, with pan and zoom.
 - **Also:** 720p / 1080p / source-resolution output, lossless AAC audio passthrough, automatic handling of phone rotation metadata, and a Chinese / English UI that follows the browser language and can be switched manually.
 
@@ -271,4 +285,4 @@ npm run deploy       # = npm run build（复制站点文件到 dist/）+ cf depl
 - The whole file is loaded into memory.
 - No multi-clip editing and no undo yet.
 
-Third-party code: mp4box.js (BSD-3-Clause) and mp4-muxer (MIT), both included in `vendor/`.
+Third-party code: mp4box.js (BSD-3-Clause), mp4-muxer (MIT) and gifenc (MIT), all included in `vendor/`.

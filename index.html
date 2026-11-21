@@ -13,6 +13,7 @@
   <div class="top-actions">
     <button class="btn ghost lang" id="langBtn" data-i18n="langSwitch" data-i18n-title="langSwitchTitle"></button>
     <label class="btn ghost"><span data-i18n="openVideo"></span><input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" hidden /></label>
+    <button class="btn ghost" id="gifBtn" disabled data-i18n="exportGif" data-i18n-title="exportGifTitle"></button>
     <button class="btn primary" id="exportBtn" disabled data-i18n="exportMp4"></button>
   </div>
 </header>
@@ -173,11 +174,19 @@
 <div class="modal" id="modal" hidden>
   <div class="modal-card">
     <h3 id="mTitle"></h3>
-    <div class="m-preview"><canvas id="mCanvas"></canvas><video id="mVideo" controls playsinline hidden></video></div>
+    <div class="m-preview"><canvas id="mCanvas"></canvas><video id="mVideo" controls playsinline hidden></video><img id="mImg" alt="GIF" hidden /></div>
+    <div class="gif-opts" id="gifOpts" hidden>
+      <div class="gif-row"><span data-i18n="gifSize"></span>
+        <div class="seg" id="gifW"><button data-v="320">320</button><button data-v="480">480</button><button data-v="640">640</button></div></div>
+      <div class="gif-row"><span data-i18n="gifFps"></span>
+        <div class="seg" id="gifFps"><button data-v="10">10 fps</button><button data-v="15">15 fps</button><button data-v="20">20 fps</button></div></div>
+      <div class="gif-note" id="gifNote"></div>
+    </div>
     <div class="progress"><div id="mBar"></div></div>
     <div class="m-info" id="mInfo"></div>
     <div class="m-actions">
       <button class="btn ghost" id="mCancel"></button>
+      <button class="btn primary" id="mStart" hidden data-i18n="gifStart"></button>
       <a class="btn primary" id="mDownload" hidden data-i18n="download"></a>
     </div>
   </div>
@@ -188,6 +197,7 @@
 
 <script src="vendor/mp4box.all.min.js"></script>
 <script src="vendor/mp4-muxer.js"></script>
+<script src="vendor/gifenc.js"></script>
 <script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
