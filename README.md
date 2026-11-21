@@ -124,7 +124,7 @@ npm run samples      # 生成 samples/landscape.mp4 与 samples/rotated.mp4
 .
 ├── index.html            # 页面结构；所有文案通过 data-i18n* 属性引用
 ├── styles.css            # 深色编辑器风格样式
-├── i18n.js               # 中英文案字典、语言检测、t() / applyI18n() / setLang()
+├── i18n.js               # 中英文案字典、语言检测、tr() / applyI18n() / setLang()
 ├── app.js                # 全部逻辑（见下方分区）
 ├── vendor/
 │   ├── mp4box.all.min.js
@@ -181,7 +181,7 @@ AAC 音频样本直接从源文件复制进新 MP4，不解码也不重编码，
 
 - 所有文案集中在 `i18n.js` 的 `I18N.zh` / `I18N.en` 字典中。
 - 静态 HTML 用属性引用：`data-i18n`（文本）、`data-i18n-html`、`data-i18n-title`（提示）、`data-i18n-ph`（占位符）。
-- JS 中用 `t('key', { 变量 })` 取文案，例如 `t('srtImported', { n: 3 })`。
+- JS 中用 `tr('key', { 变量 })` 取文案，例如 `tr('srtImported', { n: 3 })`。（函数名特意不用 `t`，因为 `t` 在代码里常作为时间变量，会把翻译函数遮蔽掉。）
 - **语言选择顺序**：用户手动选择（存于 `localStorage` 的 `clipo.lang`）→ 浏览器 `navigator.languages` 中第一个 `zh*` / `en*` → 默认英文。
 - 切换语言时派发 `langchange` 事件，`app.js` 刷新动态文案。用户没改过的默认水印文字也会跟着切换。
 

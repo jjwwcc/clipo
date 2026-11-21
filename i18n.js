@@ -87,8 +87,8 @@ function detectLang() {
 }
 let LANG = detectLang();
 
-/** t('key', {vars}) → 当前语言文本 */
-function t(key, vars) {
+/** tr('key', {vars}) → 当前语言文本 */
+function tr(key, vars) {
   let s = I18N[LANG][key] ?? I18N.en[key] ?? key;
   if (vars && typeof s === 'string') s = s.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`));
   return s;
@@ -97,11 +97,11 @@ function t(key, vars) {
 /** 把静态 HTML 中带 data-i18n* 的元素翻译成当前语言 */
 function applyI18n(root = document) {
   document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
-  document.title = t('pageTitle');
-  root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
-  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
-  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
-  root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+  document.title = tr('pageTitle');
+  root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = tr(el.dataset.i18nHtml); });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = tr(el.dataset.i18nTitle); });
+  root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = tr(el.dataset.i18nPh); });
 }
 
 function setLang(lang) {

@@ -37,7 +37,7 @@ const S = {
   fit: 'contain', bg: 'blur', bgColor: '#000000', zoom: 1, panX: 0, panY: 0,
   cues: [], selCue: null,
   sub: { size: 0.055, color: '#ffffff', stroke: true, strokeColor: '#000000', box: false, boxColor: '#000000', bold: true, font: 'sans', x: 0.5, y: 0.86 },
-  wm: { on: true, type: 'text', text: t('defaultWm'), img: null, color: '#ffffff', size: 0.04, opacity: 0.75, tile: false, x: 0.82, y: 0.08 },
+  wm: { on: true, type: 'text', text: tr('defaultWm'), img: null, color: '#ffffff', size: 0.04, opacity: 0.75, tile: false, x: 0.82, y: 0.08 },
   tab: 'frame',
 };
 let cueId = 1;
@@ -187,7 +187,7 @@ function render(c, W, H, src, sw, sh, t, ui) {
   if (ui) ui.hits.sub = null;
   const cue = activeCue(t);
   if (cue || (ui && ui.ghost)) {
-    const text = cue ? cue.text : t('ghostSub');
+    const text = cue ? cue.text : tr('ghostSub');
     const fs = S.sub.size * m;
     c.save();
     if (!cue) c.globalAlpha = 0.45;
@@ -256,7 +256,7 @@ async function demuxFile(file) {
     mp4.onReady = (i) => {
       info = i;
       const vt = i.videoTracks[0];
-      if (!vt) return reject(new Error(t('errNoVideoTrack')));
+      if (!vt) return reject(new Error(tr('errNoVideoTrack')));
       mp4.setExtractionOptions(vt.id, 'v', { nbSamples: Infinity });
       const at = i.audioTracks[0];
       if (at) mp4.setExtractionOptions(at.id, 'a', { nbSamples: Infinity });
@@ -267,7 +267,7 @@ async function demuxFile(file) {
       mp4.appendBuffer(buf);
       mp4.flush();
     } catch (e) { return reject(e); }
-    if (!info) return reject(new Error(t('errUnparsable')));
+    if (!info) return reject(new Error(tr('errUnparsable')));
 
     try {
     const vt = info.videoTracks[0];
@@ -386,16 +386,16 @@ function drawFilm() {
 /* ------------------------------------------------------------------ load */
 async function loadFile(file) {
   if (!file) return;
-  if (!('VideoEncoder' in window)) { toast(t('errNoWebCodecs')); return; }
-  toast(t('parsing'));
+  if (!('VideoEncoder' in window)) { toast(tr('errNoWebCodecs')); return; }
+  toast(tr('parsing'));
   let D;
   try { D = await demuxFile(file); }
-  catch (e) { console.error(e); toast(t('parseFailed', { msg: e.message || e })); return; }
+  catch (e) { console.error(e); toast(tr('parseFailed', { msg: e.message || e })); return; }
 
   if (S.src) URL.revokeObjectURL(S.src.url);
   const url = URL.createObjectURL(file);
   video.src = url;
-  await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error(t('errCantPlay'))); })
+  await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error(tr('errCantPlay'))); })
     .catch((e) => toast(e.message));
   S.src = { name: file.name, url, w: video.videoWidth, h: video.videoHeight, duration: video.duration };
   S.demux = D;
@@ -420,7 +420,7 @@ async function loadFile(file) {
   video.currentTime = 0.001;
   buildThumbs(D).catch((e) => console.warn(e));
   if (!(await VideoDecoder.isConfigSupported(decoderConfig(D))).supported)
-    toast(t('warnCantDecode', { codec: D.vt.codec }), 4000);
+    toast(tr('warnCantDecode', { codec: D.vt.codec }), 4000);
 }
 
 /* ------------------------------------------------------------------ preview loop */
@@ -588,7 +588,7 @@ function renderCueTrack() {
     el.dataset.id = c.id;
     el.style.left = `${c.start / d * 100}%`;
     el.style.width = `${(c.end - c.start) / d * 100}%`;
-    el.textContent = c.text || t('cueEmptyText');
+    el.textContent = c.text || tr('cueEmptyText');
     el.title = `${fmt(c.start)} → ${fmt(c.end)}\n${c.text}`;
     el.addEventListener('pointerdown', (e) => cueDrag(e, c, el));
     cueTrack.appendChild(el);
@@ -628,13 +628,13 @@ function cueDrag(e, c, el) {
 const MIN_CLIP = 0.2;
 function isFullClip() { return !S.src || (S.trimIn <= 0.001 && S.trimOut >= S.src.duration - 0.001); }
 function renderTrim() {
-  if (!S.src) { $('#trimInfo').textContent = t('trimFull', { d: fmt(0) }); return; }
+  if (!S.src) { $('#trimInfo').textContent = tr('trimFull', { d: fmt(0) }); return; }
   const d = S.src.duration, a = S.trimIn / d * 100, b = S.trimOut / d * 100;
   Object.assign($('#shadeL').style, { left: '0%', width: `${a}%` });
   Object.assign($('#shadeR').style, { left: `${b}%`, width: `${100 - b}%` });
   Object.assign($('#trimWin').style, { left: `${a}%`, width: `${b - a}%` });
   const full = isFullClip(), info = $('#trimInfo');
-  info.textContent = full ? t('trimFull', { d: fmt(d) }) : `✂ ${fmt(S.trimIn)} – ${fmt(S.trimOut)} · ${(S.trimOut - S.trimIn).toFixed(1)}s`;
+  info.textContent = full ? tr('trimFull', { d: fmt(d) }) : `✂ ${fmt(S.trimIn)} – ${fmt(S.trimOut)} · ${(S.trimOut - S.trimIn).toFixed(1)}s`;
   info.classList.toggle('cut', !full);
   $('#trimReset').disabled = full;
 }
@@ -681,7 +681,7 @@ function addCue(t, text = '') {
   if (cur) t = cur.end;
   const next = S.cues.find((c) => c.start > t);
   const end = Math.min(t + 2.5, next ? next.start : d, d);
-  const cue = { id: cueId++, start: t, end: Math.max(end, t + 0.3), text: text || t('newCue') };
+  const cue = { id: cueId++, start: t, end: Math.max(end, t + 0.3), text: text || tr('newCue') };
   S.cues.push(cue); sortCues();
   S.selCue = cue;
   renderCueList(); renderCueTrack();
@@ -705,21 +705,21 @@ function renderCueList() {
   const list = $('#cueList');
   list.innerHTML = '';
   if (!S.cues.length) {
-    list.innerHTML = `<div class="cue-empty">${t('cueEmpty')}</div>`;
+    list.innerHTML = `<div class="cue-empty">${tr('cueEmpty')}</div>`;
     return;
   }
   for (const c of S.cues) {
     const el = document.createElement('div');
     el.className = 'cue-item' + (S.selCue === c ? ' sel' : '');
     el.dataset.id = c.id;
-    el.innerHTML = `<div class="cue-times"><input class="st" value="${fmt(c.start)}" /> → <input class="en" value="${fmt(c.end)}" /><button class="del" title="${t('del')}">✕</button></div><textarea rows="1"></textarea>`;
+    el.innerHTML = `<div class="cue-times"><input class="st" value="${fmt(c.start)}" /> → <input class="en" value="${fmt(c.end)}" /><button class="del" title="${tr('del')}">✕</button></div><textarea rows="1"></textarea>`;
     const ta = el.querySelector('textarea');
     ta.value = c.text;
     const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
     requestAnimationFrame(fit);
     ta.addEventListener('input', () => {
       c.text = ta.value; fit();
-      const blk = $(`.cue[data-id="${c.id}"]`); if (blk) blk.textContent = c.text || t('cueEmptyText');
+      const blk = $(`.cue[data-id="${c.id}"]`); if (blk) blk.textContent = c.text || tr('cueEmptyText');
     });
     ta.addEventListener('focus', () => { selectCue(c, false); if (video.paused && activeCue(video.currentTime) !== c) video.currentTime = c.start + 0.01; });
     const onTime = (inp, key) => inp.addEventListener('change', () => {
@@ -773,7 +773,7 @@ for (const r of RATIOS) {
   const b = document.createElement('button');
   b.className = 'ratio';
   b.dataset.v = r.id;
-  b.innerHTML = `<span class="shape"></span><span ${r.label ? '' : 'data-i18n="ratioOrig"'}>${r.label ?? t('ratioOrig')}</span>`;
+  b.innerHTML = `<span class="shape"></span><span ${r.label ? '' : 'data-i18n="ratioOrig"'}>${r.label ?? tr('ratioOrig')}</span>`;
   b.addEventListener('click', () => { S.aspect = r.id; S.panX = S.panY = 0; syncAll(); });
   ratioGrid.appendChild(b);
 }
@@ -841,7 +841,7 @@ $('#wmImg').addEventListener('change', async (e) => {
   S.wm.img = await createImageBitmap(f);
   S.wm.type = 'image'; S.wm.on = true;
   const th = $('#wmThumb'); th.src = URL.createObjectURL(f); th.hidden = false;
-  const up = $('#wmUploadTxt'); up.dataset.i18n = 'wmChange'; up.textContent = t('wmChange');
+  const up = $('#wmUploadTxt'); up.dataset.i18n = 'wmChange'; up.textContent = tr('wmChange');
   syncAll();
 });
 
@@ -867,8 +867,8 @@ function syncAll() {
   if (document.activeElement !== $('#wmText')) $('#wmText').value = S.wm.text;
   if (S.src) {
     const { W, H } = outSize();
-    $('#outSize').textContent = t('outSize', { W, H });
-    $('#sizeBadge').textContent = `${S.aspect === 'orig' ? t('badgeOrig') : S.aspect} · ${W}×${H}`;
+    $('#outSize').textContent = tr('outSize', { W, H });
+    $('#sizeBadge').textContent = `${S.aspect === 'orig' ? tr('badgeOrig') : S.aspect} · ${W}×${H}`;
     layoutCanvas();
   }
 }
@@ -880,14 +880,14 @@ $('#addCueBtn2').addEventListener('click', onAdd);
 $('#srtInput').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   const cues = parseSRT(await f.text());
-  if (!cues.length) return toast(t('srtNone'));
+  if (!cues.length) return toast(tr('srtNone'));
   S.cues = cues; sortCues(); S.selCue = null;
   renderCueList(); renderCueTrack();
-  toast(t('srtImported', { n: cues.length }));
+  toast(tr('srtImported', { n: cues.length }));
   e.target.value = '';
 });
 $('#exportSrt').addEventListener('click', () => {
-  if (!S.cues.length) return toast(t('noCues'));
+  if (!S.cues.length) return toast(tr('noCues'));
   download(new Blob([toSRT()], { type: 'text/plain' }), (S.src?.name.replace(/\.\w+$/, '') || 'subtitles') + '.srt');
 });
 function download(blob, name) {
@@ -948,7 +948,7 @@ async function pickEncoderConfig(W, H, fps) {
     const cfg = { codec, width: W, height: H, bitrate, framerate: fps, avc: { format: 'avc' }, latencyMode: 'quality' };
     try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) return cfg; } catch { /* next */ }
   }
-  throw new Error(t('errEncoder', { W, H }));
+  throw new Error(tr('errEncoder', { W, H }));
 }
 
 async function startExport() {
@@ -959,8 +959,8 @@ async function startExport() {
   const job = (exportJob = { cancelled: false });
   const modal = $('#modal'), mCanvas = $('#mCanvas'), mVideo = $('#mVideo'), bar = $('#mBar'), info = $('#mInfo'), dl = $('#mDownload');
   modal.hidden = false; mCanvas.hidden = false; mVideo.hidden = true; dl.hidden = true;
-  $('#mTitle').textContent = t('exporting'); $('#mCancel').textContent = t('cancel');
-  bar.style.width = '0%'; info.textContent = t('preparing');
+  $('#mTitle').textContent = tr('exporting'); $('#mCancel').textContent = tr('cancel');
+  bar.style.width = '0%'; info.textContent = tr('preparing');
   mCanvas.width = W > H ? 480 : Math.round(300 * W / H); mCanvas.height = Math.round(mCanvas.width * H / W);
   const mctx = mCanvas.getContext('2d');
 
@@ -968,7 +968,7 @@ async function startExport() {
   let dec, enc;
   try {
     const dcfg = decoderConfig(D);
-    if (!(await VideoDecoder.isConfigSupported(dcfg)).supported) throw new Error(t('errCantDecode', { codec: D.vt.codec }));
+    if (!(await VideoDecoder.isConfigSupported(dcfg)).supported) throw new Error(tr('errCantDecode', { codec: D.vt.codec }));
     const fps = Math.round(D.fps) || 30;
     const ecfg = await pickEncoderConfig(W, H, fps);
 
@@ -987,7 +987,7 @@ async function startExport() {
     const inRange = (t) => t >= tIn - eps && t < tOut - eps;
     const keep = [];
     D.vs.forEach((s, i) => { if (inRange(s.cts / s.timescale - D.vOff)) keep.push(i); });
-    if (!keep.length) throw new Error(t('errEmptyTrim'));
+    if (!keep.length) throw new Error(tr('errEmptyTrim'));
     const total = keep.length;
     let first = keep[0];
     const last = keep[keep.length - 1];
@@ -1025,7 +1025,7 @@ async function startExport() {
       bar.style.width = `${(pct * 100).toFixed(1)}%`;
       const el = (performance.now() - t0) / 1000;
       const speed = (encoded / fps) / Math.max(el, 0.01);
-      info.textContent = t('progress', { n: encoded, total, W, H, codec: ecfg.codec, speed: speed.toFixed(1) });
+      info.textContent = tr('progress', { n: encoded, total, W, H, codec: ecfg.codec, speed: speed.toFixed(1) });
     };
 
     for (let i = first; i <= last; i++) {
@@ -1055,21 +1055,21 @@ async function startExport() {
     const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
 
-    $('#mTitle').textContent = t('exportDone');
+    $('#mTitle').textContent = tr('exportDone');
     bar.style.width = '100%';
-    info.textContent = t('doneInfo', { W, H, dur: fmt(tOut - tIn), mb: (blob.size / 1048576).toFixed(1), secs }) + (D.at ? t('withAudio') : '');
+    info.textContent = tr('doneInfo', { W, H, dur: fmt(tOut - tIn), mb: (blob.size / 1048576).toFixed(1), secs }) + (D.at ? tr('withAudio') : '');
     mCanvas.hidden = true; mVideo.hidden = false;
     mVideo.src = URL.createObjectURL(blob);
     dl.hidden = false;
     dl.href = mVideo.src;
     dl.download = S.src.name.replace(/\.\w+$/, '') + `_${S.aspect.replace(':', 'x')}_edited.mp4`;
-    $('#mCancel').textContent = t('close');
+    $('#mCancel').textContent = tr('close');
   } catch (e) {
     if (e.message !== 'cancelled') {
       console.error(e);
-      $('#mTitle').textContent = t('exportFailed');
+      $('#mTitle').textContent = tr('exportFailed');
       info.textContent = e.message || String(e);
-      $('#mCancel').textContent = t('close');
+      $('#mCancel').textContent = tr('close');
     }
   } finally {
     try { dec && dec.state !== 'closed' && dec.close(); } catch {}
@@ -1081,18 +1081,18 @@ async function startExport() {
 /* ------------------------------------------------------------------ language */
 function renderFileName() {
   const el = $('#fileName');
-  if (!S.src) { el.textContent = t('noFile'); return; }
+  if (!S.src) { el.textContent = tr('noFile'); return; }
   const D = S.demux;
-  el.textContent = `${S.src.name} · ${S.src.w}×${S.src.h} · ${D.fps.toFixed(0)}fps · ${D.at ? 'AAC' : t('noAudio')}`;
+  el.textContent = `${S.src.name} · ${S.src.w}×${S.src.h} · ${D.fps.toFixed(0)}fps · ${D.at ? 'AAC' : tr('noAudio')}`;
 }
 function relabelPosGrid() {
-  $$('#wmPos button').forEach((b) => { const [j, i] = b.dataset.pos.split(',').map(Number); b.title = t('posNames')[j][i]; });
+  $$('#wmPos button').forEach((b) => { const [j, i] = b.dataset.pos.split(',').map(Number); b.title = tr('posNames')[j][i]; });
 }
 $('#langBtn').addEventListener('click', () => setLang(LANG === 'zh' ? 'en' : 'zh'));
 document.addEventListener('langchange', (e) => {
   // 用户没改过的默认水印文字，跟着语言切换
   const other = I18N[e.detail === 'zh' ? 'en' : 'zh'].defaultWm;
-  if (S.wm.text === other) S.wm.text = t('defaultWm');
+  if (S.wm.text === other) S.wm.text = tr('defaultWm');
   renderFileName(); relabelPosGrid(); renderCueList(); renderCueTrack(); renderTrim(); syncAll();
 });
 
@@ -1102,4 +1102,4 @@ renderCueList();
 renderFileName();
 relabelPosGrid();
 renderTrim();
-if (!('VideoEncoder' in window)) toast(t('errNoWebCodecs'), 6000);
+if (!('VideoEncoder' in window)) toast(tr('errNoWebCodecs'), 6000);
