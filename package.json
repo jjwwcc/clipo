@@ -1,0 +1,15 @@
+{
+  "name": "clipo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 8765",
+    "build": "rm -rf dist && mkdir -p dist && cp -R index.html i18n.js app.js styles.css vendor dist/",
+    "deploy": "npm run build && cf deploy ./dist",
+    "samples": "bash scripts/make-samples.sh"
+  },
+  "devDependencies": {
+    "cf": "^1.0.0-rc.2"
+  },
+  "description": "Clipo 快剪 — minimal WYSIWYG video editor (trim, subtitles, watermark, aspect ratio) powered by WebCodecs"
+}

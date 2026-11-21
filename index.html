@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clipo</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo"></span>Clipo<span class="cn" data-i18n="brandCn"></span> <small data-i18n="brandTag"></small></div>
+  <div class="file-name" id="fileName"></div>
+  <div class="top-actions">
+    <button class="btn ghost lang" id="langBtn" data-i18n="langSwitch" data-i18n-title="langSwitchTitle"></button>
+    <label class="btn ghost"><span data-i18n="openVideo"></span><input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" hidden /></label>
+    <button class="btn primary" id="exportBtn" disabled data-i18n="exportMp4"></button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="editor">
+    <div class="stage" id="stage">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">▶</div>
+        <div class="dz-title" data-i18n="dzTitle"></div>
+        <div class="dz-sub" data-i18n="dzSub"></div>
+        <label class="btn primary"><span data-i18n="chooseFile"></span><input type="file" id="fileInput2" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" hidden /></label>
+      </div>
+      <canvas id="preview" hidden></canvas>
+      <div class="stage-badge" id="sizeBadge" hidden></div>
+      <div class="stage-hint" id="stageHint" hidden data-i18n="stageHint"></div>
+    </div>
+
+    <div class="transport" id="transport">
+      <button class="icon-btn" id="playBtn" data-i18n-title="playTitle">▶</button>
+      <div class="time"><span id="curTime">00:00.0</span> / <span id="durTime">00:00.0</span></div>
+      <div class="trim-ctl">
+        <button class="btn small ghost" id="setIn" disabled data-i18n="setIn" data-i18n-title="setInTitle"></button>
+        <span class="trim-info" id="trimInfo"></span>
+        <button class="btn small ghost" id="setOut" disabled data-i18n="setOut" data-i18n-title="setOutTitle"></button>
+        <button class="btn small ghost icon" id="trimReset" disabled data-i18n-title="trimResetTitle">↺</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn small" id="addCueBtn" disabled data-i18n="addCueHere"></button>
+    </div>
+
+    <div class="timeline" id="timeline">
+      <div class="tl-labels">
+        <div class="tl-label ruler-l"></div>
+        <div class="tl-label" data-i18n="tlVideo"></div>
+        <div class="tl-label" data-i18n="tlSubs"></div>
+      </div>
+      <div class="tl-body" id="tlBody">
+        <div class="ruler" id="ruler"></div>
+        <div class="film"><canvas id="film"></canvas></div>
+        <div class="cuetrack" id="cueTrack" data-i18n-title="cueTrackTitle"></div>
+        <div class="trim-shade" id="shadeL"></div>
+        <div class="trim-shade" id="shadeR"></div>
+        <div class="trim-win" id="trimWin"><span class="th l" data-h="in" data-i18n-title="trimDragIn"></span><span class="th r" data-h="out" data-i18n-title="trimDragOut"></span></div>
+        <div class="playhead" id="playhead"><span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <nav class="tabs" id="tabs">
+      <button data-tab="frame" class="active" data-i18n="tabFrame"></button>
+      <button data-tab="sub" data-i18n="tabSub"></button>
+      <button data-tab="wm" data-i18n="tabWm"></button>
+    </nav>
+
+    <!-- 画面 -->
+    <div class="tab-body" data-body="frame">
+      <h4 data-i18n="aspect"></h4>
+      <div class="ratio-grid" id="ratioGrid"></div>
+
+      <h4 data-i18n="fit"></h4>
+      <div class="seg" data-bind="fit">
+        <button data-v="contain" data-i18n="fitContain"></button>
+        <button data-v="cover" data-i18n="fitCover"></button>
+      </div>
+
+      <h4 data-i18n="background"></h4>
+      <div class="row">
+        <div class="seg" data-bind="bg">
+          <button data-v="blur" data-i18n="bgBlur"></button>
+          <button data-v="color" data-i18n="bgColor"></button>
+        </div>
+        <input type="color" id="bgColor" value="#000000" />
+      </div>
+
+      <h4><span data-i18n="zoom"></span> <span class="val" id="zoomVal">100%</span></h4>
+      <input type="range" id="zoom" min="0.3" max="3" step="0.01" value="1" />
+      <button class="btn small ghost full" id="resetPos" data-i18n="resetPos"></button>
+
+      <h4 data-i18n="resolution"></h4>
+      <div class="seg" data-bind="res">
+        <button data-v="720">720p</button>
+        <button data-v="1080">1080p</button>
+        <button data-v="src" data-i18n="resSrc"></button>
+      </div>
+      <div class="out-size" id="outSize"></div>
+    </div>
+
+    <!-- 字幕 -->
+    <div class="tab-body" data-body="sub" hidden>
+      <div class="row gap">
+        <button class="btn small" id="addCueBtn2" disabled data-i18n="addCue"></button>
+        <label class="btn small ghost"><span data-i18n="importSrt"></span><input type="file" id="srtInput" accept=".srt,.vtt,text/plain" hidden /></label>
+        <button class="btn small ghost" id="exportSrt" data-i18n="exportSrt"></button>
+      </div>
+      <div class="cue-list" id="cueList"></div>
+
+      <h4 data-i18n="style"></h4>
+      <div class="row">
+        <div class="seg" data-bind="sub.font">
+          <button data-v="sans" data-i18n="fontSans"></button>
+          <button data-v="serif" data-i18n="fontSerif"></button>
+          <button data-v="round" data-i18n="fontRound"></button>
+        </div>
+        <button class="toggle" data-toggle="sub.bold">B</button>
+      </div>
+      <h4><span data-i18n="fontSize"></span> <span class="val" id="subSizeVal"></span></h4>
+      <input type="range" id="subSize" min="0.025" max="0.12" step="0.001" />
+      <div class="row">
+        <label class="swatch"><span data-i18n="textColor"></span> <input type="color" id="subColor" /></label>
+        <label class="swatch"><button class="toggle" data-toggle="sub.stroke" data-i18n="stroke"></button><input type="color" id="subStrokeColor" /></label>
+        <label class="swatch"><button class="toggle" data-toggle="sub.box" data-i18n="box"></button><input type="color" id="subBoxColor" /></label>
+      </div>
+      <h4 data-i18n="position"></h4>
+      <div class="seg" id="subPos">
+        <button data-y="0.12" data-i18n="posTop"></button>
+        <button data-y="0.5" data-i18n="posMid"></button>
+        <button data-y="0.86" data-i18n="posBottom"></button>
+      </div>
+    </div>
+
+    <!-- 水印 -->
+    <div class="tab-body" data-body="wm" hidden>
+      <div class="row between">
+        <h4 class="inline" data-i18n="wmEnable"></h4>
+        <button class="switch" data-toggle="wm.on"><span></span></button>
+      </div>
+      <div class="seg" data-bind="wm.type">
+        <button data-v="text" data-i18n="wmText"></button>
+        <button data-v="image" data-i18n="wmImage"></button>
+      </div>
+      <div data-show="wm.type=text">
+        <input class="text-in" id="wmText" data-i18n-ph="wmPlaceholder" />
+        <div class="row"><label class="swatch"><span data-i18n="color"></span> <input type="color" id="wmColor" /></label></div>
+      </div>
+      <div data-show="wm.type=image">
+        <label class="upload" id="wmUpload">
+          <img id="wmThumb" hidden />
+          <span id="wmUploadTxt" data-i18n="wmUpload"></span>
+          <input type="file" id="wmImg" accept="image/*" hidden />
+        </label>
+      </div>
+      <h4><span data-i18n="size"></span> <span class="val" id="wmSizeVal"></span></h4>
+      <input type="range" id="wmSize" min="0.02" max="0.3" step="0.001" />
+      <h4><span data-i18n="opacity"></span> <span class="val" id="wmOpVal"></span></h4>
+      <input type="range" id="wmOp" min="0.05" max="1" step="0.01" />
+      <div class="row between">
+        <h4 class="inline" data-i18n="tile"></h4>
+        <button class="switch" data-toggle="wm.tile"><span></span></button>
+      </div>
+      <h4 data-i18n="position"></h4>
+      <div class="pos-grid" id="wmPos"></div>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <h3 id="mTitle"></h3>
+    <div class="m-preview"><canvas id="mCanvas"></canvas><video id="mVideo" controls playsinline hidden></video></div>
+    <div class="progress"><div id="mBar"></div></div>
+    <div class="m-info" id="mInfo"></div>
+    <div class="m-actions">
+      <button class="btn ghost" id="mCancel"></button>
+      <a class="btn primary" id="mDownload" hidden data-i18n="download"></a>
+    </div>
+  </div>
+</div>
+
+<video id="video" playsinline preload="auto"></video>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/mp4box.all.min.js"></script>
+<script src="vendor/mp4-muxer.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
