@@ -4,6 +4,7 @@
 > A minimal, WYSIWYG video editor that runs entirely in your browser. [English summary ↓](#english)
 
 **在线使用：<https://clipo.ondarlin.com>**
+**Generate Video：<https://www.ondarlin.com>**
 
 Clipo 基于 [WebCodecs](https://developer.mozilla.org/docs/Web/API/WebCodecs_API) 直接调用浏览器内置的硬件编解码器，把常见的四件事做到最简单：
 
